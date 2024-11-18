@@ -33,38 +33,35 @@ func handleSymResources(appName: String) {
     let currentDirectory = FileManager.default.currentDirectoryPath
     let appPath = URL(fileURLWithPath: currentDirectory).appendingPathComponent("\(appName).app")
     let appResourcesPath = appPath.appendingPathComponent("Contents/Resources")
-    let sourcesDir = URL(fileURLWithPath: currentDirectory).appendingPathComponent("Sources")
+    let buildBundlePath = URL(fileURLWithPath: currentDirectory)
+        .appendingPathComponent(".build/release")
+        .appendingPathComponent("\(appName)_\(appName).bundle")
 
     // Check if {appName}.app exists
     guard FileManager.default.fileExists(atPath: appPath.path) else {
-        print("Error: \(appName).app does not exist. Please initialize the app first.".ansi(.red))
+        print("Error: \(appName).app does not exist. Please initialize the app first.")
         return
     }
 
-    // Look for Resources directory in /Sources/{appName}/Resources or /Sources/Resources
-    let possibleResourcePaths = [
-        sourcesDir.appendingPathComponent("\(appName)/Resources"),
-        sourcesDir.appendingPathComponent("Resources")
-    ]
-
-    guard let sourceResourcesPath = possibleResourcePaths.first(where: { FileManager.default.fileExists(atPath: $0.path) }) else {
-        print("Error: No Resources directory found in /Sources/{appName}/Resources or /Sources/Resources.".ansi(.red))
+    // Ensure the .bundle exists
+    guard FileManager.default.fileExists(atPath: buildBundlePath.path) else {
+        print("Error: \(buildBundlePath.path) not found. Ensure resources are bundled during build.")
         return
     }
 
-    // Remove {appName}.app/Contents/Resources if it exists and is empty
+    // Remove existing symlink or directory
     do {
         try removeDirectoryIfEmpty(destination: appResourcesPath)
     } catch {
-        print("Error: \(error.localizedDescription)".ansi(.red))
+        print("Error: \(error.localizedDescription)")
         return
     }
 
-    // Create symlink from located Resources directory to {appName}.app/Contents/Resources
+    // Create symlink to the .bundle
     do {
-        try createSymlink(source: sourceResourcesPath, destination: appResourcesPath)
+        try createSymlink(source: buildBundlePath, destination: appResourcesPath)
     } catch {
-        print("Error: Failed to create symlink: \(error.localizedDescription)".ansi(.red))
+        print("Error: Failed to create symlink: \(error.localizedDescription)")
     }
 }
 
@@ -90,12 +87,15 @@ struct AppSkeletonGenerator {
         let resourcesSymlinkPath = contentsDir.appendingPathComponent("Resources")
 
         do {
+            // Create MacOS directory for binary
             try FileManager.default.createDirectory(at: macOSDir, withIntermediateDirectories: true, attributes: nil)
 
-            if let sourceResourcesPath = findSourceResourcesPath() {
-                try createSymlink(source: sourceResourcesPath, destination: resourcesSymlinkPath)
+            // Locate the .bundle in the build directory
+            if let buildBundlePath = findBuildBundlePath() {
+                try createSymlink(source: buildBundlePath, destination: resourcesSymlinkPath)
+                print("Created symlink: \(resourcesSymlinkPath.path) -> \(buildBundlePath.path)")
             } else {
-                print("No Resources directory found in Sources. Skipping Resources symlink creation.")
+                print("No .bundle file found in build directory. Skipping Resources symlink creation.")
             }
 
             print("Created app directory structure.")
@@ -158,13 +158,15 @@ struct AppSkeletonGenerator {
     }
 
     private func createResourcesSymlinkIfNeeded() throws {
-        guard let sourceResourcesPath = findSourceResourcesPath() else {
-            print("No Resources directory found in /Sources/{appName}/Resources or /Sources/Resources. Skipping symlink creation.")
+        let appResourcesPath = appDirectory.appendingPathComponent("Contents/Resources")
+
+        // Locate the `.bundle` file in the build directory
+        guard let buildBundlePath = findBuildBundlePath() else {
+            print("No .bundle file found in the build directory. Ensure resources are bundled during the build process.")
             return
         }
 
-        let appResourcesPath = appDirectory.appendingPathComponent("Contents/Resources")
-
+        // Remove existing symlink or directory if it's empty
         do {
             try removeDirectoryIfEmpty(destination: appResourcesPath)
         } catch {
@@ -172,19 +174,24 @@ struct AppSkeletonGenerator {
             throw error
         }
 
-        try createSymlink(source: sourceResourcesPath, destination: appResourcesPath)
+        // Create symlink from the `.bundle` to `Contents/Resources`
+        try createSymlink(source: buildBundlePath, destination: appResourcesPath)
     }
 
-    private func findSourceResourcesPath() -> URL? {
+    private func findBuildBundlePath() -> URL? {
         let currentDirectory = FileManager.default.currentDirectoryPath
-        let sourcesDir = URL(fileURLWithPath: currentDirectory).appendingPathComponent("Sources")
+        let buildDir = URL(fileURLWithPath: currentDirectory).appendingPathComponent(".build/release")
 
-        let possibleResourcePaths = [
-            sourcesDir.appendingPathComponent("\(appName)/Resources"),
-            sourcesDir.appendingPathComponent("Resources")
-        ]
+        // Construct the expected `.bundle` path based on app name
+        let bundlePath = buildDir.appendingPathComponent("\(appName)_\(appName).bundle")
 
-        return possibleResourcePaths.first { FileManager.default.fileExists(atPath: $0.path) }
+        // Check if the `.bundle` exists
+        if FileManager.default.fileExists(atPath: bundlePath.path) {
+            return bundlePath
+        }
+
+        print("Expected bundle not found at path: \(bundlePath.path)")
+        return nil
     }
 
     func resetResourcesSymlink() throws {
