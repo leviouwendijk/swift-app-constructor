@@ -1,4 +1,9 @@
 import Foundation
+import plate
+// import ArgumentParser
+
+let user = "leviouwendijk"
+let bundleUserIdentifier = User.string()
 
 func createSymlink(source: URL, destination: URL) throws {
     let fileManager = FileManager.default
@@ -117,7 +122,7 @@ struct AppSkeletonGenerator {
             <key>CFBundleName</key>
             <string>\(appName)</string>
             <key>CFBundleIdentifier</key>
-            <string>com.leviouwendijk.\(appName.lowercased())</string>
+            <string>com.\(user.isEmpty ? bundleUserIdentifier : user).\(appName.lowercased())</string>
             <key>CFBundleVersion</key>
             <string>1.0</string>
             <key>CFBundleExecutable</key>
@@ -236,5 +241,3 @@ func main() {
 }
 
 main()
-
-
