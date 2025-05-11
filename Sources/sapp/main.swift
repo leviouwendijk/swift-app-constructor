@@ -220,20 +220,30 @@ func main() {
         return
     }
 
-    print("")
-    print("Enter the name of your app:".ansi(.bold))
-    guard let appName = readLine(), !appName.isEmpty else {
+
+    var appNameInput = ""
+
+    if arguments.count == 2 {
+        appNameInput = arguments[1]
+    } else {
+
         print("")
-        print("Error: App name cannot be empty.".ansi(.red))
-        return
+        print("Enter the name of your app:".ansi(.bold))
+        guard let appName = readLine(), !appName.isEmpty else {
+            print("")
+            print("Error: App name cannot be empty.".ansi(.red))
+            return
+        }
+
+        appNameInput = appName
+
+        print("")
     }
 
-    print("")
-
-    let generator = AppSkeletonGenerator(appName: appName)
+    let generator = AppSkeletonGenerator(appName: appNameInput)
     do {
         try generator.generateSkeleton()
-        print("App skeleton generated successfully for ".ansi(.green) + "\(appName)".ansi(.bold))
+        print("App skeleton generated successfully for ".ansi(.green) + "\(appNameInput)".ansi(.bold))
     } catch {
         print("Failed to generate app skeleton: \(error.localizedDescription)".ansi(.red))
     }
